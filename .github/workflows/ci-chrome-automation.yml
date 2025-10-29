@@ -1,0 +1,61 @@
+# 🤖 CI Workflow – Chrome Automation, Go Runner & Auto Commit
+# This GitHub Actions workflow automates:
+# 1. Running a Go script (main.go) that uses non-headless Chrome
+# 2. Committing any updated files automatically
+# 3. Running on a schedule or manually via GitHub Actions UI
+
+name: CI Chrome Automation & Auto Commit # 🌟 Workflow name as shown in GitHub Actions tab
+
+on: # ⚡ Define workflow triggers
+  schedule: # 🕒 Schedule-based automatic runs
+    - cron: "0 0 * * *" # 📅 Run every day at 00:00 UTC
+  workflow_dispatch: # 🧠 Allow manual triggering from GitHub Actions UI
+
+permissions: # 🔐 Workflow-wide permissions
+  contents: write # ✍️ Allow workflow to push commits to repository
+
+jobs: # 🧩 Define all jobs
+  chrome-go-automation: # 🔧 Name of the main job
+    runs-on: ubuntu-latest # 🐧 Use the latest Ubuntu virtual machine
+
+    permissions: # 🔐 Job-level permissions (redundant but explicit)
+      contents: write # ✍️ Allow writing/pushing to repo contents
+
+    steps: # 🪜 Ordered steps in the job
+
+      - name: Checkout Repository # 🧱 Step 1: Clone the repository
+        uses: actions/checkout@v5 # 🔄 Official GitHub action to checkout code
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }} # 🔑 Use built-in token for authentication
+
+      - name: Setup Go Environment # ⚙️ Step 2: Install Go
+        uses: actions/setup-go@v6 # 📦 Official Go setup action
+        with:
+          go-version-file: "go.mod"
+
+      - name: Install Chrome & Xvfb # 🌐 Step 3: Install Chrome browser & virtual display
+        run: |
+          sudo apt-get update -y # 🔁 Update Ubuntu package list
+          sudo apt-get install -y xvfb # 🖥️ Install X virtual framebuffer for GUI apps
+          sudo apt-get install -y google-chrome-stable || true # 🌍 Install Chrome, ignore error if not found
+
+      - name: Start Virtual Display # 🖥️ Step 4: Start Xvfb for non-headless Chrome
+        run: |
+          Xvfb :99 -screen 0 1920x1080x24 & # ▶️ Start virtual framebuffer on display :99 with full HD resolution
+          echo "DISPLAY=:99" >> $GITHUB_ENV # 💡 Set DISPLAY environment variable for Chrome
+
+      - name: Run Go Automation Script # 🚀 Step 5: Execute Go program
+        run: go run main.go # 🖥️ Run Go script (main.go) that uses Chrome automation
+
+      - name: Commit & Push Updates # 💾 Step 6: Commit and push changed files
+        run: |
+          git config --global user.name "github-actions[bot]" # 👤 Set Git username for commits
+          git config --global user.email "github-actions[bot]@users.noreply.github.com" # 📧 Set commit email
+          git pull --rebase # 🔁 Update local branch with remote before pushing
+          git add . # ➕ Stage all modified files
+          if ! git diff --cached --quiet; then # 🧠 Check if there are staged changes
+            git commit -m "🤖 Auto Update: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" # 🕒 Commit with UTC timestamp
+            git push # 🚀 Push commits to remote repository
+          else
+            echo "✅ No changes to commit." # 💤 No changes detected
+          fi # 🔚 End of conditional block
